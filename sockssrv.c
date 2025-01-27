@@ -408,13 +408,62 @@ static void zero_arg(char *s) {
 	for(i=0;i<l;i++) s[i] = 0;
 }
 
+
+int read_config(const char *config_file, const char **listenip, unsigned short *port, const char **auth_user, const char **auth_pass) {
+    FILE *file = fopen(config_file, "r");
+    if (!file) {
+        perror("Failed to open config file");
+        return -1;
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = 0;
+
+        if (line[0] == '#' || line[0] == '\0') {
+            continue;
+        }
+
+        char *key = strtok(line, "=");
+        char *value = strtok(NULL, "=");
+		
+        if (key && value) {
+            if (strcmp(key, "listenip") == 0) {
+                *listenip = strdup(value); 
+            } else if (strcmp(key, "port") == 0) {
+                *port = (unsigned short)atoi(value);
+            } else if (strcmp(key, "auth_user") == 0) {
+                *auth_user = strdup(value); 
+            } else if (strcmp(key, "auth_pass") == 0) {
+                *auth_pass = strdup(value);
+            }
+        }
+    }
+    fclose(file);
+    return 0;
+}
+//char listenip[64] = {0}
 int main(int argc, char** argv) {
 	int ch;
-	const char *listenip = "0.0.0.0";
+	const char *listenip;
 	char *p, *q;
-	unsigned port = 1080;
-	while((ch = getopt(argc, argv, ":1qb:i:p:u:P:w:")) != -1) {
+	unsigned short port = 1080;
+	const char *config_file = NULL;
+
+	while((ch = getopt(argc, argv, ":1qb:i:p:u:P:w:c:")) != -1) {
 		switch(ch) {
+			case 'c': 
+                config_file = optarg;
+                if (read_config(config_file, &listenip, &port, &auth_user, &auth_pass) != 0) {
+                    fprintf(stderr, "Failed to read config file: %s\n", config_file);
+                    return 1;
+                }
+
+			//printf("Listen IP: %s\n", listenip);
+			//printf("Port: %u\n", port);
+			//printf("Auth User: %s\n", auth_user);
+			//printf("Auth Pass: %s\n", auth_pass);
+                break;
 			case 'w': /* fall-through */
 			case '1':
 				if(!auth_ips)
@@ -460,6 +509,12 @@ int main(int argc, char** argv) {
 				return usage();
 		}
 	}
+
+
+
+
+
+
 	if((auth_user && !auth_pass) || (!auth_user && auth_pass)) {
 		dprintf(2, "error: user and pass must be used together\n");
 		return 1;
